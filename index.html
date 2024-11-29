@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>GitHub Markdown Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.1/styles/github.min.css" rel="stylesheet">
+    <style>
+        .markdown-body {
+            background-color: #f6f8fa;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        pre {
+            background-color: #f4f4f4;
+            border-radius: 6px;
+        }
+        .repo-header {
+            background-color: #24292e;
+            color: white;
+            padding: 15px;
+        }
+        .contributor-card {
+            text-align: center;
+            margin: 10px;
+        }
+        .contributor-card img {
+            border-radius: 50%;
+            max-width: 80px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row repo-header">
+            <div class="col-12">
+                <h1>GitHub Repository Documentation</h1>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col-md-3 sidebar">
+                <div class="list-group">
+                    <!-- <a href="#readme" class="list-group-item list-group-item-action active">README</a>
+                    <a href="#installation" class="list-group-item list-group-item-action">Installation</a>
+                    <a href="#usage" class="list-group-item list-group-item-action">Usage</a> -->
+                    <a href="#contributors" class="list-group-item list-group-item-action">Contributors</a>
+                </div>
+            </div>
+            <div class="col-md-9">
+                <div id="markdown-content" class="markdown-body">
+                    <!-- Dynamic markdown content will be loaded here -->
+                </div>
+                <div id="contributors" class="row d-none">
+                    <!-- Contributors will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.5.1/highlight.min.js"></script>
+    
+    <script>
+        // Function to fetch and render markdown
+        async function renderMarkdown(url) {
+            try {
+                const response = await fetch(url);
+                const markdown = await response.text();
+                
+                // Configure marked for syntax highlighting
+                marked.setOptions({
+                    highlight: function(code, lang) {
+                        return hljs.highlightAuto(code).value;
+                    }
+                });
+
+                const htmlContent = marked.parse(markdown);
+                document.getElementById('markdown-content').innerHTML = htmlContent;
+                document.getElementById('markdown-content').classList.remove('d-none');
+                document.getElementById('contributors').classList.add('d-none');
+            } catch (error) {
+                console.error('Error fetching markdown:', error);
+                document.getElementById('markdown-content').innerHTML = 
+                    '<div class="alert alert-danger">Failed to load documentation</div>';
+            }
+        }
+
+        // Function to fetch and render contributors
+        async function renderContributors(repoOwner, repoName) {
+            try {
+                const url = `https://api.github.com/repos/${repoOwner}/${repoName}/contributors`;
+                const response = await fetch(url);
+                const contributors = await response.json();
+                
+                const container = document.getElementById('contributors');
+                container.innerHTML = '';
+                contributors.forEach(contributor => {
+                    const card = `
+                        <div class="col-md-3 contributor-card">
+                            <img src="${contributor.avatar_url}" alt="${contributor.login}">
+                            <h6>${contributor.login}</h6>
+                            <a href="${contributor.html_url}" target="_blank" class="btn btn-sm btn-primary">Profile</a>
+                        </div>
+                    `;
+                    container.innerHTML += card;
+                });
+
+                document.getElementById('markdown-content').classList.add('d-none');
+                container.classList.remove('d-none');
+            } catch (error) {
+                console.error('Error fetching contributors:', error);
+                document.getElementById('contributors').innerHTML = 
+                    '<div class="alert alert-danger">Failed to load contributors</div>';
+            }
+        }
+
+        // Load README by default
+        renderMarkdown('https://raw.githubusercontent.com/djontop/corporatestock/main/pROGRESS.md');
+
+        // Event listeners for sidebar navigation
+        document.querySelectorAll('.list-group-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                const section = this.getAttribute('href').substring(1);
+                let url;
+                if (section === 'contributors') {
+                    renderContributors('djontop', 'corporatestock');
+                } else {
+                    switch(section) {
+                        case 'readme':
+                            url = 'https://raw.githubusercontent.com/djontop/corporatestock/main/README.md';
+                            break;
+                        case 'installation':
+                            url = 'https://raw.githubusercontent.com/djontop/corporatestock/main/INSTALLATION.md';
+                            break;
+                        case 'usage':
+                            url = 'https://raw.githubusercontent.com/djontop/corporatestock/main/USAGE.md';
+                            break;
+                    }
+                    renderMarkdown(url);
+                }
+
+                // Update active state
+                document.querySelectorAll('.list-group-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    </script>
+</body>
+</html>
