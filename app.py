@@ -1,129 +1,139 @@
 from flask import Flask, jsonify, render_template
 from nse import NSE
 from pathlib import Path
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timedelta
 import os
 
 app = Flask(__name__)
 
-# Configure download folder
 DOWNLOAD_FOLDER = Path(os.getenv('DOWNLOAD_FOLDER', 'nse_downloads'))
 DOWNLOAD_FOLDER.mkdir(exist_ok=True)
 
 def get_nse_client():
-    """Create NSE client with context management"""
     return NSE(download_folder=DOWNLOAD_FOLDER)
-
-def parse_date(date_str: Optional[str]) -> Optional[datetime]:
-    """Parse date string to datetime object"""
-    if not date_str:
-        return None
-    try:
-        return datetime.strptime(date_str, '%Y-%m-%d')
-    except ValueError:
-        return None
 
 @app.route('/')
 def index():
-    """Serve the main frontend page"""
-    return render_template('index.html')
+    return render_template('stocks.html')
 
-@app.errorhandler(Exception)
-def handle_error(error):
-    """Global error handler"""
-    return jsonify({
-        'error': str(error),
-        'type': error.__class__.__name__
-    }), 500
-
-@app.route('/api/status')
-def get_market_status():
-    """Get NSE market status"""
+@app.route('/api/stock/<symbol>')
+def stock_info(symbol):
     with get_nse_client() as nse:
-        return jsonify(nse.status())
+        try:
+            meta = nse.equityMetaInfo(symbol)
+            quote = nse.quote(symbol, section='trade_info')
+            return jsonify({
+                'meta': meta,
+                'quote': quote
+            })
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
-@app.route('/api/holidays/<type>')
-def get_holidays(type):
-    """Get NSE holidays by type (trading/clearing)"""
-    if type not in ['trading', 'clearing']:
-        return jsonify({'error': 'Invalid holiday type'}), 400
-    
+@app.route('/api/quote/<symbol>')
+def equity_quote(symbol):
     with get_nse_client() as nse:
-        return jsonify(nse.holidays(type=type))
+        try:
+            return jsonify(nse.equityQuote(symbol))
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
-@app.route('/api/block-deals')
-def get_block_deals():
-    """Get NSE block deals"""
+@app.route('/api/market/advance-decline')
+def advance_decline():
+    try:
+        with get_nse_client() as nse:
+            data = nse.advanceDecline()
+            return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/market/gainers/<index_type>')
+def top_gainers(index_type):
     with get_nse_client() as nse:
-        return jsonify(nse.blockDeals())
+        try:
+            if index_type == 'fno':
+                data = nse.listFnoStocks()
+            elif index_type == 'sme':
+                data = nse.listSME()
+            else:
+                data = nse.listIndexStocks('NIFTY 50')
+            return jsonify(nse.gainers(data, count=10))
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
-@app.route('/api/actions')
+@app.route('/api/market/losers/<index_type>')
+def top_losers(index_type):
+    with get_nse_client() as nse:
+        try:
+            if index_type == 'fno':
+                data = nse.listFnoStocks()
+            elif index_type == 'sme':
+                data = nse.listSME()
+            else:
+                data = nse.listIndexStocks('NIFTY 50')
+            return jsonify(nse.losers(data, count=10))
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+@app.route('/api/corporate/actions')
 def get_corporate_actions():
-    """Get corporate actions with optional filters"""
     from flask import request
-    
-    segment = request.args.get('segment', 'equities')
-    if segment not in ['equities', 'sme', 'debt', 'mf']:
-        return jsonify({'error': 'Invalid segment'}), 400
-        
-    symbol = request.args.get('symbol')
-    from_date = parse_date(request.args.get('from_date'))
-    to_date = parse_date(request.args.get('to_date'))
-    
-    with get_nse_client() as nse:
-        return jsonify(nse.actions(
-            segment=segment,
-            symbol=symbol,
-            from_date=from_date,
-            to_date=to_date
-        ))
+    try:
+        segment = request.args.get('segment', 'equities')
+        symbol = request.args.get('symbol')
+        from_date = datetime.strptime(request.args.get('from_date', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')), '%Y-%m-%d')
+        to_date = datetime.strptime(request.args.get('to_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
 
-@app.route('/api/announcements')
+        with get_nse_client() as nse:
+            return jsonify(nse.actions(
+                segment=segment,
+                symbol=symbol,
+                from_date=from_date,
+                to_date=to_date
+            ))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/corporate/announcements')
 def get_announcements():
-    """Get corporate announcements with optional filters"""
     from flask import request
-    
-    index = request.args.get('index', 'equities')
-    if index not in ['equities', 'sme', 'debt', 'mf', 'invitsreits']:
-        return jsonify({'error': 'Invalid index'}), 400
-        
-    symbol = request.args.get('symbol')
-    fno = request.args.get('fno', 'false').lower() == 'true'
-    from_date = parse_date(request.args.get('from_date'))
-    to_date = parse_date(request.args.get('to_date'))
-    
-    with get_nse_client() as nse:
-        return jsonify(nse.announcements(
-            index=index,
-            symbol=symbol,
-            fno=fno,
-            from_date=from_date,
-            to_date=to_date
-        ))
+    try:
+        index = request.args.get('index', 'equities')
+        symbol = request.args.get('symbol')
+        fno = request.args.get('fno', '').lower() == 'true'
+        from_date = datetime.strptime(request.args.get('from_date', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')), '%Y-%m-%d')
+        to_date = datetime.strptime(request.args.get('to_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
 
-@app.route('/api/board-meetings')
+        with get_nse_client() as nse:
+            return jsonify(nse.announcements(
+                index=index,
+                symbol=symbol,
+                fno=fno,
+                from_date=from_date,
+                to_date=to_date
+            ))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/corporate/board-meetings')
 def get_board_meetings():
-    """Get board meetings with optional filters"""
     from flask import request
-    
-    index = request.args.get('index', 'equities')
-    if index not in ['equities', 'sme']:
-        return jsonify({'error': 'Invalid index'}), 400
-        
-    symbol = request.args.get('symbol')
-    fno = request.args.get('fno', 'false').lower() == 'true'
-    from_date = parse_date(request.args.get('from_date'))
-    to_date = parse_date(request.args.get('to_date'))
-    
-    with get_nse_client() as nse:
-        return jsonify(nse.boardMeetings(
-            index=index,
-            symbol=symbol,
-            fno=fno,
-            from_date=from_date,
-            to_date=to_date
-        ))
+    try:
+        index = request.args.get('index', 'equities')
+        symbol = request.args.get('symbol')
+        fno = request.args.get('fno', '').lower() == 'true'
+        from_date = datetime.strptime(request.args.get('from_date', (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')), '%Y-%m-%d')
+        to_date = datetime.strptime(request.args.get('to_date', datetime.now().strftime('%Y-%m-%d')), '%Y-%m-%d')
+
+        with get_nse_client() as nse:
+            return jsonify(nse.boardMeetings(
+                index=index,
+                symbol=symbol,
+                fno=fno,
+                from_date=from_date,
+                to_date=to_date
+            ))
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
