@@ -17,4 +17,5 @@
 - Fix remaining types of announcements display
 
 
-https://i.imgur.com/4nYAzSi.png
+### Screenshot
+![Progress Screenshot](https://i.imgur.com/4nYAzSi.png)
