@@ -15,12 +15,10 @@
 - Alert System created - email sent using google SMTP - subscribing stocks
 
 
-### DAY4 -
+### DAY4 - Next Todos
 - Alert system , with providing PDFS, Attachments
 - Proper real time alerts etc.
-- Recheck with other functionality of announcements, 
-- Recheck with other functionality of companies with current/real time data.
-- Fix remaining types of announcements display
+
 
 ### TESTING
 - Recheck with other functionality of announcements, 
