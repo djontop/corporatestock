@@ -72,7 +72,43 @@
             <div id="tradingInfo"></div>
           </div>
         </div>
-
+        <div id="subscriptionSection" class="bg-white rounded-lg shadow p-6 mb-8">
+          <h2 class="text-xl font-bold mb-4">Stock Alerts Subscription</h2>
+          <div class="space-y-4">
+              <div>
+                  <label class="block text-sm font-medium text-gray-700">Email</label>
+                  <input 
+                      type="email" 
+                      id="subscriptionEmail" 
+                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                      placeholder="Enter your email"
+                  >
+              </div>
+              <div>
+                  <label class="block text-sm font-medium text-gray-700">Stock Symbol</label>
+                  <input 
+                      type="text" 
+                      id="subscriptionSymbol" 
+                      class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"
+                      placeholder="Enter stock symbol"
+                  >
+              </div>
+              <div class="flex space-x-4">
+                  <button 
+                      onclick="subscribe()" 
+                      class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                  >
+                      Subscribe
+                  </button>
+                  <button 
+                      onclick="unsubscribe()" 
+                      class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+                  >
+                      Unsubscribe
+                  </button>
+              </div>
+          </div>
+      </div>
         <!-- Market Data Tab -->
         <div id="marketData" class="tab-content">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -307,7 +343,65 @@
           alert("Error fetching stock data");
         }
       }
+      async function subscribe() {
+    const email = document.getElementById('subscriptionEmail').value;
+    const symbol = document.getElementById('subscriptionSymbol').value.toUpperCase();
+    
+    if (!email || !symbol) {
+        alert('Please enter both email and symbol');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/subscribe', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, symbol }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('Subscription successful! You will receive email alerts for ' + symbol);
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        alert('Error subscribing: ' + error.message);
+    }
+}
 
+async function unsubscribe() {
+    const email = document.getElementById('subscriptionEmail').value;
+    const symbol = document.getElementById('subscriptionSymbol').value.toUpperCase();
+    
+    if (!email || !symbol) {
+        alert('Please enter both email and symbol');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/unsubscribe', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, symbol }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('Unsubscribed successfully from ' + symbol);
+        } else {
+            alert('Error: ' + data.error);
+        }
+    } catch (error) {
+        alert('Error unsubscribing: ' + error.message);
+    }
+}
       async function updateAdvanceDecline() {
         const data = await fetchData("market/advance-decline");
         if (!data) return;
